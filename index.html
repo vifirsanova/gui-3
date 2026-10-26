@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Grammar Trainer</title>
+<style>
+  :root{
+    --felt:#eef0ea;
+    --card:#ffffff;
+    --ink:#14140f;
+    --ink-2:#5c5c50;
+    --ink-3:#93938a;
+    --line:#e0e2da;
+    --line-2:#eef0e8;
+    --ok:#2a6b34;
+    --err:#a83a2c;
+    --accent:#14140f;
+    --shadow-1:0 1px 2px rgba(20,20,15,.06), 0 4px 12px rgba(20,20,15,.05);
+    --shadow-2:0 2px 6px rgba(20,20,15,.08), 0 12px 28px rgba(20,20,15,.10);
+    --r-card:18px;
+    --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif;
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+    --mono:ui-monospace,SFMono-Regular,Menlo,monospace;
+
+    --rail-w: 220px;
+    --panel-w: 360px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--felt);color:var(--ink);
+            font-family:var(--font);font-size:15px;line-height:1.55;
+            -webkit-font-smoothing:antialiased;overflow:hidden}
+
+  body::before{
+    content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+    background:
+      radial-gradient(circle at 20% 10%, rgba(255,255,255,.5), transparent 45%),
+      radial-gradient(circle at 80% 90%, rgba(0,0,0,.03), transparent 55%);
+  }
+
+  /* ================= shell ================= */
+  .app{
+    position:relative;z-index:1;
+    height:100vh;
+    display:grid;
+    grid-template-columns: var(--rail-w) 1fr;
+    grid-template-rows: 52px 1fr;
+    grid-template-areas:
+      "strip strip"
+      "rail  stage";
+  }
+
+  /* ================= strip ================= */
+  .strip{
+    grid-area:strip;
+    display:flex;align-items:center;justify-content:space-between;
+    padding: 0 24px;
+    background:var(--card);
+    border-bottom:1px solid var(--line);
+  }
+  .strip .crumb{font-family:var(--serif);font-size:15px;color:var(--ink-2)}
+  .strip .crumb b{color:var(--ink);font-weight:600}
+
+  /* ================= rail (обычное меню) ================= */
+  .rail{
+    grid-area:rail;
+    background:var(--card);
+    border-right:1px solid var(--line);
+    display:flex;flex-direction:column;
+    padding: 12px 10px;
+    gap: 2px;
+    overflow-y:auto;
+    min-height:0;
+  }
+  .rail-title{
+    font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;
+    color:var(--ink-3);font-weight:600;
+    padding: 6px 10px 8px;
+  }
+  .rail-item{
+    position:relative;
+    display:flex;align-items:center;gap:12px;
+    padding: 9px 12px;
+    border-radius: 8px;
+    border:0;background:transparent;
+    cursor:pointer;font-family:inherit;
+    color:var(--ink-2);font-size:14px;text-align:left;
+    width:100%;
+    transition: background .12s, color .12s;
+  }
+  .rail-item:hover{background:rgba(0,0,0,.04);color:var(--ink)}
+  .rail-item.active{background:rgba(0,0,0,.06);color:var(--ink);font-weight:500}
+  .rail-item.active::before{
+    content:"";position:absolute;left:0;top:8px;bottom:8px;width:3px;
+    background:var(--accent);border-radius:0 2px 2px 0;
+  }
+  .rail-item .ico{
+    width:18px;height:18px;flex:none;
+    display:grid;place-items:center;
+    color:currentColor;
+  }
+  .rail-item .ico svg{display:block}
+  .rail-item .lbl{flex:1;min-width:0;white-space:nowrap;
+                  overflow:hidden;text-overflow:ellipsis}
+  .rail-item .cnt{
+    font-size:11px;color:var(--ink-3);font-variant-numeric:tabular-nums;
+    background:rgba(0,0,0,.05);padding:1px 7px;border-radius:999px;
+  }
+  .rail-item.active .cnt{background:rgba(0,0,0,.10);color:var(--ink-2)}
+
+  /* ================= stage ================= */
+  .stage{
+    grid-area:stage;
+    display:grid;
+    grid-template-rows: auto 1fr auto;
+    padding: 18px 24px 22px;
+    min-height:0;
+    gap:12px;
+    transition: padding-right .2s ease;
+  }
+
+  /* ================= balance ================= */
+  .balance{
+    justify-self:center;
+    display:grid;
+    grid-template-columns: 72px auto 72px;
+    align-items:end;
+    gap: 20px;
+  }
+  .balance .side{
+    display:flex;flex-direction:column;align-items:center;gap:6px;
+    cursor:pointer;user-select:none;
+    padding: 4px 0;border-radius:10px;
+    transition:background .15s;
+  }
+  .balance .side:hover{background:rgba(0,0,0,.03)}
+  .balance .side .bar{
+    width:8px;background:var(--line);border-radius:4px;
+    transition:background .15s, height .25s ease;
+  }
+  .balance .side.soft .bar{height:26px}
+  .balance .side.hard .bar{height:44px}
+  .balance .side:hover .bar{background:#bcbeb2}
+  .balance .side .lbl{
+    font-size:11px;color:var(--ink-3);
+    text-transform:uppercase;letter-spacing:.06em;
+  }
+  .balance .mid{
+    display:flex;flex-direction:column;align-items:center;
+    min-width:78px;padding: 8px 14px;
+    background:var(--card);border-radius:14px;box-shadow:var(--shadow-1);
+  }
+  .balance .num{
+    font-family:var(--serif);font-size:28px;font-weight:600;
+    line-height:1;color:var(--ink);
+  }
+  .balance .of{
+    font-size:10.5px;color:var(--ink-3);margin-top:3px;
+    font-variant-numeric:tabular-nums;
+  }
+  .balance .name{
+    font-size:10px;color:var(--ink-3);margin-top:3px;
+    text-transform:uppercase;letter-spacing:.06em;
+  }
+
+  /* ================= main card ================= */
+  .card-wrap{display:grid;place-items:center;min-height:0}
+  .card-main{
+    position:relative;
+    width:min(560px, 100%);
+    max-height:100%;overflow:auto;
+    background:var(--card);border-radius:var(--r-card);
+    box-shadow:var(--shadow-2);
+    padding:32px 34px 26px;
+  }
+  .card-main .corner{
+    position:absolute;top:16px;right:20px;
+    font-family:var(--serif);font-size:12px;color:var(--ink-3);
+    letter-spacing:.04em;
+  }
+  .card-main .corner b{color:var(--ink);font-weight:600}
+  .card-main .suit{
+    position:absolute;top:16px;left:22px;
+    width:10px;height:10px;border-radius:2px;background:var(--accent);
+    opacity:.85;
+  }
+  .card-main .topic{
+    font-size:11px;text-transform:uppercase;letter-spacing:.08em;
+    color:var(--ink-3);margin-bottom:14px;
+  }
+  .card-main .prompt{
+    font-family:var(--serif);
+    font-size:26px;line-height:1.38;letter-spacing:-.005em;
+    color:var(--ink);margin:0 0 24px;
+  }
+  .card-main .prompt .blank{
+    display:inline-block;min-width:120px;
+    border-bottom:1.5px dashed var(--ink-3);
+    color:var(--ink-3);text-align:center;padding:0 8px 1px;
+    font-style:italic;
+  }
+  .card-main .hintw{
+    font-family:var(--font);font-size:13px;
+    color:var(--ink-3);font-style:normal;margin-left:4px;
+  }
+  .card-main .choices{display:flex;flex-direction:column;gap:8px}
+  .card-main .choice{
+    display:flex;align-items:center;gap:14px;
+    padding:12px 14px;border:1px solid var(--line);border-radius:12px;
+    cursor:pointer;background:var(--card);text-align:left;width:100%;
+    font-family:inherit;font-size:15px;color:var(--ink);
+    transition:border-color .15s, background .15s;
+  }
+  .card-main .choice:hover{border-color:#c9ccc1}
+  .card-main .choice .key{
+    width:22px;height:22px;border-radius:6px;border:1px solid var(--line);
+    display:grid;place-items:center;font-size:11px;color:var(--ink-3);
+    font-family:var(--mono);flex:none;
+  }
+  .card-main .choice.sel{border-color:var(--ink);background:#fbfbf8}
+  .card-main .choice.sel .key{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .card-main .choice.ok{border-color:var(--ok);background:#f2f8f2}
+  .card-main .choice.ok .key{background:var(--ok);color:#fff;border-color:var(--ok)}
+  .card-main .choice.bad{border-color:var(--err);background:#fbf3f1}
+  .card-main .choice.bad .key{background:var(--err);color:#fff;border-color:var(--err)}
+  .card-main .choice .txt{flex:1}
+
+  .card-main .foot{
+    display:flex;justify-content:space-between;align-items:center;
+    margin-top:20px;
+  }
+  .card-main .foot .keys{font-size:11.5px;color:var(--ink-3)}
+  .btn{
+    border:0;border-radius:10px;padding:9px 18px;
+    font-size:13.5px;font-weight:500;cursor:pointer;font-family:inherit;
+  }
+  .btn.primary{background:var(--ink);color:#fff}
+  .btn.primary:disabled{opacity:.28;cursor:not-allowed}
+
+  /* ================= tokens ================= */
+  .tokens{
+    justify-self:center;display:flex;gap:6px;align-items:center;
+  }
+  .tokens i{
+    width:8px;height:8px;border-radius:50%;background:var(--line);
+    display:block;transition:background .15s, transform .15s;
+  }
+  .tokens i.done{background:var(--ink)}
+  .tokens i.current{background:var(--ink);transform:scale(1.35)}
+  .tokens i.err{background:var(--err)}
+
+  /* ================= panel ================= */
+  .panel{
+    position:fixed;top:52px;bottom:0;
+    left:var(--rail-w);
+    width:min(var(--panel-w), calc(100vw - var(--rail-w)));
+    background:var(--card);
+    border-right:1px solid var(--line);
+    box-shadow: 24px 0 48px -24px rgba(20,20,15,.18);
+    z-index:30;
+    display:none;flex-direction:column;
+    animation: slideIn .18s ease;
+  }
+  .panel.open{display:flex}
+  @keyframes slideIn{
+    from{opacity:0;transform:translateX(-6px)}
+    to{opacity:1;transform:none}
+  }
+  .panel header{
+    display:flex;justify-content:space-between;align-items:center;
+    padding: 16px 20px;border-bottom:1px solid var(--line-2);flex:none;
+  }
+  .panel header h3{
+    margin:0;font-family:var(--serif);font-size:15px;font-weight:600;
+  }
+  .panel header button{
+    border:0;background:transparent;font-size:13px;color:var(--ink-3);
+    cursor:pointer;padding:4px 8px;border-radius:6px;font-family:inherit;
+  }
+  .panel header button:hover{background:rgba(0,0,0,.05);color:var(--ink)}
+  .panel .body{flex:1;overflow-y:auto;padding: 6px 20px 16px}
+
+  /* материалы */
+  .mat-list{display:flex;flex-direction:column}
+  .mat-item{
+    display:flex;align-items:flex-start;justify-content:space-between;
+    gap:14px;padding: 14px 0;
+    border-bottom: 1px solid var(--line-2);
+    background:transparent;border-left:0;border-right:0;border-top:0;
+    cursor:pointer;text-align:left;font-family:inherit;width:100%;
+  }
+  .mat-item:last-child{border-bottom:0}
+  .mat-item .tag{
+    font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;
+    color:var(--ink-3);margin-bottom:2px;
+  }
+  .mat-item .ttl{font-size:14px;color:var(--ink);line-height:1.4}
+  .mat-item .desc{font-size:12.5px;color:var(--ink-3);margin-top:2px}
+  .mat-item .go{color:var(--ink-3);font-size:14px;margin-top:2px}
+
+  /* помощник */
+  .act-list{display:flex;flex-direction:column}
+  .act-item{
+    display:flex;align-items:center;justify-content:space-between;
+    gap:14px;padding: 14px 0;
+    border-bottom: 1px solid var(--line-2);
+    background:transparent;border-left:0;border-right:0;border-top:0;
+    cursor:pointer;text-align:left;font-family:inherit;width:100%;
+  }
+  .act-item:last-child{border-bottom:0}
+  .act-item .ttl{font-size:14px;color:var(--ink);margin-bottom:2px}
+  .act-item .desc{font-size:12.5px;color:var(--ink-3)}
+  .act-item .go{color:var(--ink-3);font-size:14px}
+
+  /* журнал */
+  .ev{
+    display:grid;grid-template-columns:26px 1fr;gap:12px;
+    padding:12px 0;border-bottom:1px solid var(--line-2);
+  }
+  .ev:last-child{border-bottom:0}
+  .ev .dot{
+    width:22px;height:22px;border-radius:50%;
+    display:grid;place-items:center;flex:none;margin-top:1px;
+    background:var(--line-2);color:var(--ink-2);font-size:10.5px;
+    font-weight:600;font-family:var(--mono);
+  }
+  .ev.bot .dot{background:var(--ink);color:#fff}
+  .ev.you .dot{background:#e2e4dc;color:var(--ink)}
+  .ev.diff .dot{background:#e6e9f6;color:#2d3a8c}
+  .ev.mat .dot{background:#e8f1e4;color:var(--ok)}
+  .ev.ok .dot{background:#e8f1e4;color:var(--ok)}
+  .ev.err .dot{background:#f5e6e2;color:var(--err)}
+  .ev .row{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+  .ev .who{font-size:12.5px;font-weight:600;color:var(--ink)}
+  .ev .ts{font-family:var(--mono);font-size:11px;color:var(--ink-3)}
+  .ev .text{font-size:13.5px;margin-top:2px;line-height:1.5}
+  .ev .text em{
+    font-style:normal;font-family:var(--mono);font-size:12.5px;
+    background:var(--line-2);padding:1px 5px;border-radius:4px;
+    color:var(--ink-2);
+  }
+  .ev .note{
+    font-size:12.5px;color:var(--ink-3);margin-top:3px;
+    padding-left:8px;border-left:2px solid var(--line-2);
+  }
+
+  .composer{
+    display:flex;gap:8px;padding:10px 20px;
+    border-top:1px solid var(--line-2);
+    align-items:center;flex:none;background:var(--card);
+  }
+  .composer input{
+    flex:1;border:1px solid var(--line);border-radius:8px;
+    padding:8px 12px;font-size:13px;font-family:inherit;
+    background:#fbfbf8;min-width:0;
+  }
+  .composer input:focus{outline:none;border-color:#c9ccc1;background:#fff}
+  .composer .left-note{
+    font-size:11px;color:var(--ink-3);
+    font-variant-numeric:tabular-nums;min-width:52px;text-align:right;
+  }
+
+  /* оверлей */
+  .scrim{
+    position:fixed;inset:0;
+    background:rgba(20,20,15,.14);
+    z-index:20;opacity:0;pointer-events:none;
+    transition:opacity .18s;
+  }
+  .scrim.open{opacity:1;pointer-events:auto}
+
+  /* ================= extra cards ================= */
+  .extra-layer{
+    position:fixed;inset:0;pointer-events:none;z-index:25;
+    display:flex;justify-content:center;align-items:flex-start;
+    padding: 70px 24px 24px;
+  }
+  .extra-layer .stack{
+    display:flex;flex-direction:column;gap:12px;
+    max-width:420px;width:100%;pointer-events:none;
+  }
+  .extra-card{
+    pointer-events:auto;width:100%;
+    background:var(--card);border-radius:16px;
+    box-shadow:var(--shadow-2);padding:20px 22px;
+    animation:dropIn .2s ease;
+  }
+  @keyframes dropIn{
+    from{opacity:0;transform:translateY(6px) scale(.99)}
+    to{opacity:1;transform:none}
+  }
+  .extra-card .head{
+    display:flex;justify-content:space-between;align-items:flex-start;
+    margin-bottom:10px;gap:12px;
+  }
+  .extra-card .head .ttl{
+    font-family:var(--serif);font-size:16px;font-weight:600;
+    letter-spacing:-.005em;
+  }
+  .extra-card .head .x{
+    border:0;background:transparent;font-size:16px;color:var(--ink-3);
+    cursor:pointer;line-height:1;padding:2px 4px;
+  }
+  .extra-card .head .x:hover{color:var(--ink)}
+  .extra-card .content{font-size:13.5px;line-height:1.6;color:var(--ink)}
+  .extra-card .content h4{
+    font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;
+    color:var(--ink-3);margin:14px 0 4px;font-weight:600;
+  }
+  .extra-card .content h4:first-child{margin-top:0}
+  .extra-card .formula{
+    font-family:var(--mono);font-size:13px;background:var(--line-2);
+    padding:8px 10px;border-radius:8px;margin:4px 0;
+  }
+  .extra-card .wrong{color:var(--err);text-decoration:line-through}
+  .extra-card .right{color:var(--ok);font-weight:500}
+  .extra-card .content ul{margin:4px 0;padding-left:16px}
+  .extra-card .content li{margin:2px 0}
+
+  /* toast */
+  .toast{
+    position:fixed;top:64px;left:50%;transform:translateX(-50%);
+    background:var(--ink);color:#fff;padding:8px 14px;border-radius:999px;
+    font-size:12.5px;z-index:40;
+    opacity:0;transition:opacity .2s, transform .2s;pointer-events:none;
+  }
+  .toast.show{opacity:1;transform:translate(-50%,4px)}
+
+  /* ================= адаптив ================= */
+  @media (max-width:900px){
+    :root{ --rail-w: 64px; --panel-w: calc(100vw - var(--rail-w)); }
+    .rail{padding:10px 8px;align-items:stretch}
+    .rail-title{display:none}
+    .rail-item{padding:10px 8px;justify-content:center;gap:0}
+    .rail-item .lbl{display:none}
+    .rail-item .cnt{
+      position:absolute;top:4px;right:4px;
+      padding:0;min-width:14px;height:14px;border-radius:999px;
+      font-size:9.5px;display:grid;place-items:center;
+    }
+    .rail-item.active::before{display:none}
+    .balance{grid-template-columns: 56px auto 56px;gap:12px}
+    .stage{padding:14px 12px 18px}
+    .card-main{padding:26px 22px 22px}
+    .card-main .prompt{font-size:22px}
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <div class="strip">
+    <div class="crumb"><b>Present Perfect</b> · сессия #S-118</div>
+  </div>
+
+  <!-- rail: обычное меню -->
+  <aside class="rail" aria-label="Меню">
+    <div class="rail-title">Упражнение</div>
+
+    <button class="rail-item" id="navMats" data-panel="mats">
+      <span class="ico">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="1.6"
+             stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15.5A2.5 2.5 0 0 1 17.5 21H6.5A2.5 2.5 0 0 1 4 18.5z"/>
+          <path d="M8 7h8M8 11h8M8 15h5"/>
+        </svg>
+      </span>
+      <span class="lbl">Материалы</span>
+    </button>
+
+    <button class="rail-item" id="navTools" data-panel="tools">
+      <span class="ico">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="1.6"
+             stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 12a9 9 0 1 1-3.2-6.9"/>
+          <path d="M21 4v5h-5"/>
+        </svg>
+      </span>
+      <span class="lbl">Помощник</span>
+    </button>
+
+    <button class="rail-item" id="navHistory" data-panel="history">
+      <span class="ico">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="1.6"
+             stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="9"/>
+          <path d="M12 7v5l3 2"/>
+        </svg>
+      </span>
+      <span class="lbl">Журнал</span>
+      <span class="cnt" id="histBadge">3</span>
+    </button>
+  </aside>
+
+  <!-- stage -->
+  <main class="stage">
+
+    <div class="balance" id="balance">
+      <div class="side soft" data-delta="-1" title="Проще">
+        <div class="bar"></div>
+        <span class="lbl">проще</span>
+      </div>
+      <div class="mid">
+        <span class="num" id="diffNum">2</span>
+        <span class="of">из 5</span>
+        <span class="name">сложность</span>
+      </div>
+      <div class="side hard" data-delta="+1" title="Сложнее">
+        <div class="bar"></div>
+        <span class="lbl">сложнее</span>
+      </div>
+    </div>
+
+    <div class="card-wrap">
+      <div class="card-main">
+        <div class="suit"></div>
+        <div class="corner"><b id="cornerN">03</b> / 10</div>
+
+        <div class="topic">Present Perfect · грамматика</div>
+
+        <h1 class="prompt">
+          She <span class="blank" id="blank">___</span>
+          <span class="hintw">(to finish)</span> her homework already.
+        </h1>
+
+        <div class="choices" id="choices">
+          <button class="choice" data-correct="false">
+            <span class="key">1</span><span class="txt">have finished</span>
+          </button>
+          <button class="choice" data-correct="true">
+            <span class="key">2</span><span class="txt">has finished</span>
+          </button>
+          <button class="choice" data-correct="false">
+            <span class="key">3</span><span class="txt">finished</span>
+          </button>
+        </div>
+
+        <div class="foot">
+          <span class="keys">1–3 — выбрать · Enter — проверить</span>
+          <button class="btn primary" id="check" disabled>Проверить</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="tokens" id="tokens"></div>
+  </main>
+</div>
+
+<div class="scrim" id="scrim"></div>
+
+<aside class="panel" id="panel" aria-live="polite">
+  <header>
+    <h3 id="panelTitle">Панель</h3>
+    <button id="panelClose" aria-label="Закрыть">Закрыть</button>
+  </header>
+  <div class="body" id="panelBody"></div>
+</aside>
+
+<div class="extra-layer" id="extraLayer">
+  <div class="stack" id="extraStack"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ================= state ================= */
+const state = {
+  level: 2,
+  left: 5,
+  step: 3,
+  total: 10,
+  history: [],
+  extras: [],
+  panel: null,
+};
+
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+
+/* ================= toast ================= */
+let toastTimer = null;
+function toast(msg){
+  const t = $('#toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 1800);
+}
+
+/* ================= exercise ================= */
+const choices = $$('#choices .choice');
+const checkBtn = $('#check');
+let selected = null;
+
+choices.forEach(c => c.addEventListener('click', () => {
+  choices.forEach(x => x.classList.remove('sel','ok','bad'));
+  c.classList.add('sel'); selected = c; checkBtn.disabled = false;
+}));
+
+document.addEventListener('keydown', e => {
+  if(e.target.matches('input,textarea')) return;
+  if(['1','2','3'].includes(e.key)) choices[+e.key - 1]?.click();
+  if(e.key === 'Enter' && !checkBtn.disabled) checkBtn.click();
+  if(e.key === 'Escape'){ closePanel(); }
+});
+
+checkBtn.addEventListener('click', () => {
+  if(!selected) return;
+  const ok = selected.dataset.correct === 'true';
+  const word = selected.querySelector('.txt').textContent;
+  selected.classList.remove('sel');
+  selected.classList.add(ok ? 'ok' : 'bad');
+  $('#blank').textContent = word;
+  checkBtn.disabled = true;
+
+  if(ok){
+    pushHistory('you ok','Т','Ты', 'Ответ верный: <em>'+word+'</em>');
+    pushHistory('bot','П','Помощник', 'Подтверждено правило have/has + V3');
+    bumpLevel(+1, 'верно — правило закрепляется');
+  } else {
+    pushHistory('you err','Т','Ты', 'Ответ неверный: <em>'+word+'</em>', 'She → has');
+    bumpLevel(-1, 'ошибка — усложнение приостановлено');
+  }
+});
+
+/* ================= level ================= */
+const diffNum = $('#diffNum');
+function renderLevel(){ diffNum.textContent = state.level; }
+function bumpLevel(delta, reason){
+  const prev = state.level;
+  state.level = Math.max(1, Math.min(5, state.level + delta));
+  renderLevel();
+  pushHistory('diff', String(state.level), 'Сложность',
+              `${prev} → ${state.level}`, reason);
+}
+renderLevel();
+$$('#balance .side').forEach(el => {
+  el.addEventListener('click', () => bumpLevel(+el.dataset.delta, 'по запросу ученика'));
+});
+
+/* ================= log ================= */
+const histBadge = $('#histBadge');
+const t0 = Date.now();
+function nowStamp(){
+  const s = Math.floor((Date.now() - t0) / 1000);
+  return String(Math.floor(s/60)).padStart(2,'0') + ':' + String(s%60).padStart(2,'0');
+}
+function pushHistory(cls, dot, who, text, note){
+  const ev = { cls, dot, who, text, note, ts: nowStamp() };
+  state.history.push(ev);
+  histBadge.textContent = state.history.length;
+  if(state.panel === 'history') renderHistoryPanel();
+}
+function evNode(ev){
+  const d = document.createElement('div');
+  d.className = 'ev ' + ev.cls;
+  d.innerHTML = `
+    <div class="dot">${ev.dot}</div>
+    <div>
+      <div class="row"><span class="who">${ev.who}</span><span class="ts">${ev.ts}</span></div>
+      <div class="text">${ev.text}</div>
+      ${ev.note ? `<div class="note">${ev.note}</div>` : ''}
+    </div>`;
+  return d;
+}
+
+/* ================= panel ================= */
+const panel      = $('#panel');
+const panelTitle = $('#panelTitle');
+const panelBody  = $('#panelBody');
+const panelClose = $('#panelClose');
+const scrim      = $('#scrim');
+
+const navMats = $('#navMats');
+const navTools = $('#navTools');
+const navHistory = $('#navHistory');
+
+function setActiveNav(kind){
+  [navMats, navTools, navHistory].forEach(b => {
+    b.classList.toggle('active', b.dataset.panel === kind);
+  });
+}
+
+function openPanel(kind){
+  state.panel = kind;
+  panel.classList.add('open');
+  scrim.classList.add('open');
+  setActiveNav(kind);
+  if(kind === 'mats')         renderMatsPanel();
+  else if(kind === 'tools')   renderToolsPanel();
+  else if(kind === 'history') renderHistoryPanel();
+}
+function closePanel(){
+  state.panel = null;
+  panel.classList.remove('open');
+  scrim.classList.remove('open');
+  setActiveNav(null);
+}
+panelClose.addEventListener('click', closePanel);
+scrim.addEventListener('click', closePanel);
+
+[navMats, navTools, navHistory].forEach(btn => {
+  btn.addEventListener('click', () => {
+    const kind = btn.dataset.panel;
+    if(state.panel === kind) closePanel();
+    else openPanel(kind);
+  });
+});
+
+/* ================= materials panel ================= */
+const MATERIALS = [
+  { id:'pp',  tag:'по заданию', title:'Краткая шпаргалка', desc:'Формула, маркеры, типичная ошибка', body: () => SHEET_PP },
+  { id:'vs',  tag:'сравнение',  title:'Present Perfect vs Past Simple', desc:'Когда какой использовать', body: () => SHEET_VS },
+  { id:'mk',  tag:'опоры',      title:'Сигнальные слова', desc:'already · yet · just · ever · never', body: () => SHEET_MK },
+  { id:'3p',  tag:'морфология', title:'3-е лицо единственного', desc:'has vs have', body: () => SHEET_3P },
+  { id:'err', tag:'ошибки',     title:'Топ-5 ошибок в Present Perfect', desc:'по статистике группы', body: () => SHEET_ERR },
+];
+function renderMatsPanel(){
+  panelTitle.textContent = 'Материалы';
+  panelBody.innerHTML = '';
+  const list = document.createElement('div');
+  list.className = 'mat-list';
+  MATERIALS.forEach(m => {
+    const b = document.createElement('button');
+    b.className = 'mat-item';
+    b.innerHTML = `
+      <div>
+        <div class="tag">${m.tag}</div>
+        <div class="ttl">${m.title}</div>
+        <div class="desc">${m.desc}</div>
+      </div>
+      <span class="go">→</span>`;
+    b.addEventListener('click', () => {
+      openExtraCard({ id: m.id, title: m.title, body: m.body() });
+      pushHistory('mat','Ш','Материалы', `Открыта карта «${m.title}»`);
+      closePanel();
+    });
+    list.appendChild(b);
+  });
+  panelBody.appendChild(list);
+}
+
+/* ================= tools panel ================= */
+const TOOLS = [
+  { id:'rule',   title:'Объяснить правило',  desc:'1–2 предложения по текущему заданию' },
+  { id:'why',    title:'Разобрать мою ошибку', desc:'почему выбранный вариант неверен' },
+  { id:'sheet',  title:'Открыть шпаргалку',  desc:'Present Perfect — формула, маркеры' },
+  { id:'harder', title:'Сложнее',            desc:'+1 к уровню' },
+  { id:'easier', title:'Легче',              desc:'−1 к уровню' },
+];
+function renderToolsPanel(){
+  panelTitle.textContent = 'Помощник';
+  panelBody.innerHTML = '';
+  const list = document.createElement('div');
+  list.className = 'act-list';
+  TOOLS.forEach(t => {
+    const b = document.createElement('button');
+    b.className = 'act-item';
+    b.innerHTML = `
+      <div>
+        <div class="ttl">${t.title}</div>
+        <div class="desc">${t.desc}</div>
+      </div>
+      <span class="go">→</span>`;
+    b.addEventListener('click', () => {
+      if(t.id === 'sheet'){
+        openExtraCard({ id:'pp', title:'Present Perfect — кратко', body: SHEET_PP });
+        pushHistory('mat','Ш','Материалы','Открыта шпаргалка <em>Present Perfect — кратко</em>');
+      } else if(t.id === 'harder'){ route('Сложнее'); }
+      else if(t.id === 'easier'){ route('Легче'); }
+      else { route(t.title); }
+      closePanel();
+    });
+    list.appendChild(b);
+  });
+  panelBody.appendChild(list);
+}
+
+/* ================= history panel ================= */
+function renderHistoryPanel(){
+  panelTitle.textContent = 'Журнал';
+  panelBody.innerHTML = '';
+  if(state.history.length === 0){
+    const empty = document.createElement('div');
+    empty.style.cssText = 'padding:20px 0;color:var(--ink-3);font-size:13px';
+    empty.textContent = 'Пока пусто';
+    panelBody.appendChild(empty);
+    return;
+  }
+  state.history.forEach(ev => panelBody.appendChild(evNode(ev)));
+  panelBody.scrollTop = panelBody.scrollHeight;
+}
+
+/* ================= assistant actions ================= */
+function spend(){
+  if(state.left <= 0){
+    pushHistory('bot','П','Помощник','Лимит сообщений исчерпан — помощник вернётся на следующей карте');
+    return false;
+  }
+  state.left--;
+  return true;
+}
+function route(text){
+  if(!spend()) return;
+  pushHistory('you','Т','Ты', text);
+  setTimeout(() => {
+    const t = text.toLowerCase();
+    if(t.includes('шпарг') || t.includes('правил')){
+      pushHistory('bot','П','Помощник','Открываю шпаргалку по теме');
+      openExtraCard({ id:'pp', title:'Present Perfect — кратко', body: SHEET_PP });
+    } else if(t.includes('сложнее')){
+      pushHistory('bot','П','Помощник','Принято: следующая карта будет сложнее');
+      bumpLevel(+1,'по запросу');
+    } else if(t.includes('легче') || t.includes('проще')){
+      pushHistory('bot','П','Помощник','Принято: следующая карта будет проще');
+      bumpLevel(-1,'по запросу');
+    } else if(t.includes('ошибк') || t.includes('неверн')){
+      pushHistory('bot','П','Помощник','Ошибка в согласовании: 3-е лицо ед. ч. → has');
+    } else {
+      pushHistory('bot','П','Помощник',
+        'Отвечаю только по грамматике текущего задания',
+        'сообщение не отправлено модели — фильтр темы');
+    }
+  }, 220);
+}
+
+/* ================= extra cards ================= */
+const extraStack = $('#extraStack');
+function openExtraCard(cfg){
+  if(state.extras.includes(cfg.id)){
+    toast('Карта уже открыта'); return;
+  }
+  const card = document.createElement('div');
+  card.className = 'extra-card';
+  card.dataset.id = cfg.id;
+  card.innerHTML = `
+    <div class="head">
+      <div class="ttl">${cfg.title}</div>
+      <button class="x" title="Закрыть">×</button>
+    </div>
+    <div class="content">${cfg.body}</div>`;
+  card.querySelector('.x').addEventListener('click', () => {
+    card.remove();
+    state.extras = state.extras.filter(x => x !== cfg.id);
+  });
+  extraStack.appendChild(card);
+  state.extras.push(cfg.id);
+}
+
+/* ================= материалы (содержимое) ================= */
+const SHEET_PP = `
+  <h4>Формула</h4>
+  <div class="formula">have / has + V3</div>
+  <ul>
+    <li>I / you / we / they → <b>have</b></li>
+    <li>he / she / it → <b>has</b></li>
+  </ul>
+  <h4>Маркеры</h4>
+  <ul><li>already · yet · just · ever · never · since · for</li></ul>
+  <h4>Типичная ошибка</h4>
+  <ul><li><span class="wrong">She have finished</span> → <span class="right">She has finished</span></li></ul>
+  <h4>Пример</h4>
+  <ul><li>She <b>has finished</b> her homework.</li></ul>
+`;
+const SHEET_VS = `
+  <h4>Present Perfect</h4>
+  <ul><li>результат важен сейчас, без указания времени</li></ul>
+  <div class="formula">She has finished her homework.</div>
+  <h4>Past Simple</h4>
+  <ul><li>факт в прошлом с указанием времени</li></ul>
+  <div class="formula">She finished at 5 pm.</div>
+`;
+const SHEET_MK = `
+  <h4>Сигнальные слова</h4>
+  <ul>
+    <li><b>already</b> — уже</li>
+    <li><b>yet</b> — ещё (в вопросах и отрицаниях)</li>
+    <li><b>just</b> — только что</li>
+    <li><b>ever / never</b> — когда-либо / никогда</li>
+    <li><b>since / for</b> — с / в течение</li>
+  </ul>
+`;
+const SHEET_3P = `
+  <h4>Правило</h4>
+  <div class="formula">he / she / it → has</div>
+  <div class="formula">I / you / we / they → have</div>
+  <h4>Примеры</h4>
+  <ul><li>She <b>has</b> finished.</li><li>They <b>have</b> finished.</li></ul>
+`;
+const SHEET_ERR = `
+  <h4>Топ-5 ошибок</h4>
+  <ul>
+    <li><span class="wrong">She have finished</span> → <span class="right">She has finished</span></li>
+    <li><span class="wrong">I has seen</span> → <span class="right">I have seen</span></li>
+    <li><span class="wrong">She has finish</span> → <span class="right">She has finished</span></li>
+    <li><span class="wrong">Did she has</span> → <span class="right">Has she</span></li>
+    <li><span class="wrong">She has finished yesterday</span> → <span class="right">She finished yesterday</span></li>
+  </ul>
+`;
+
+/* ================= tokens ================= */
+(function initTokens(){
+  const t = $('#tokens');
+  t.innerHTML = '';
+  for(let i = 0; i < state.total; i++){
+    const dot = document.createElement('i');
+    if(i < state.step - 1) dot.classList.add('done');
+    else if(i === state.step - 1) dot.classList.add('current');
+    t.appendChild(dot);
+  }
+})();
+
+/* ================= init history ================= */
+state.history = [
+  { cls:'diff',    dot:'2', who:'Сложность', text:'Старт на уровне 2 — по входному тесту', ts:'00:00' },
+  { cls:'you err', dot:'Т', who:'Ты',        text:'Выбран <em>have finished</em> — неверно', note:'She → has', ts:'00:12' },
+  { cls:'bot',     dot:'П', who:'Помощник',  text:'Объяснено правило <em>has vs have</em>', ts:'00:20' },
+];
+histBadge.textContent = state.history.length;
+</script>
+</body>
+</html>
